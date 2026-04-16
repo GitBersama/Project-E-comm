@@ -1,0 +1,514 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  MANAGER
+  ADMIN
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String?
+  role      UserRole @default(CUSTOMER)
+  status    UserStatus @default(ACTIVE)
+  
+  // Relations
+  addresses      Address[]
+  orders         Order[]
+  refreshTokens  RefreshToken[]
+  activityLogs   ActivityLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  label     String // "Home", "Office", etc
+  street    String
+  city      String
+  province  String
+  zipCode   String
+  country   String @default("Indonesia")
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================================
+// PRODUCTS & CATEGORIES
+// ============================================================================
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  description String?
+  image     String?
+  isActive  Boolean  @default(true)
+
+  products  Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  slug        String   @unique
+  description String?
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  
+  price       Float    // Selling price
+  cost        Float?   // Cost price
+  stock       Int      @default(0)
+  isActive    Boolean  @default(true)
+  isVisible   Boolean  @default(true) // Show in store?
+  
+  images      ProductImage[]
+  variations  ProductVariation[]
+  promotions  Promotion[]
+  orderItems  OrderItem[]
+  stockLogs   StockLog[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([sku])
+  @@index([isActive])
+  @@index([isVisible])
+  @@index([createdAt])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model ProductVariation {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String   // e.g., "Size", "Color"
+  value     String   // e.g., "M", "Red"
+  sku       String   @unique
+  price     Float?
+  stock     Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([sku])
+}
+
+// ============================================================================
+// STOCK MANAGEMENT
+// ============================================================================
+
+enum StockLogType {
+  ADJUSTMENT
+  SALE
+  RETURN
+  DAMAGE
+  RESTOCK
+  BATCH_UPLOAD
+}
+
+model StockLog {
+  id        String        @id @default(cuid())
+  productId String
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      StockLogType
+  quantity  Int           // Positive or negative
+  reference String?       // Order ID, upload batch ID, etc
+  notes     String?
+  createdBy String?       // Super admin only
+
+  createdAt DateTime      @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PROMOTIONS & DISCOUNTS
+// ============================================================================
+
+model Promotion {
+  id        String   @id @default(cuid())
+  name      String
+  description String?
+  type      String   // "PERCENTAGE" or "FIXED"
+  value     Float
+  code      String?  @unique
+  
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  
+  minPurchase Float?
+  maxDiscount Float?
+  
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([startDate])
+  @@index([endDate])
+}
+
+// ============================================================================
+// ORDERS & PAYMENTS
+// ============================================================================
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique // Human-readable like ORD-20240101-001
+  customerId    String
+  customer      User     @relation(fields: [customerId], references: [id])
+  
+  status        OrderStatus @default(PENDING)
+  subtotal      Float
+  shippingCost  Float
+  tax           Float     @default(0)
+  discount      Float     @default(0)
+  totalAmount   Float
+
+  shippingAddressId String?
+  shippingAddress   Address?
+
+  notes         String?
+  
+  items         OrderItem[]
+  payment       Payment?
+  shipment      Shipment?
+  events        OrderEvent[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  quantity  Int
+  price     Float    // Price at time of order
+  subtotal  Float    // quantity * price
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  XENDIT_CARD
+  XENDIT_BANK_TRANSFER
+  XENDIT_EWALLET
+  MANUAL
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  xenditId        String?  @unique // External payment ID from Xendit
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  amount          Float
+  
+  paidAt          DateTime?
+  expireAt        DateTime?
+  
+  metadata        String?  // JSON string for additional data
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum OrderEventType {
+  CREATED
+  PAID
+  CANCELLED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  REFUNDED
+}
+
+model OrderEvent {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      OrderEventType
+  message   String?
+  
+  createdAt DateTime      @default(now())
+
+  @@index([orderId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SHIPPING & LOGISTICS
+// ============================================================================
+
+enum ShippingProvider {
+  GOJEK
+  GRAB
+  RAJAONGKIR
+  KURIR_TOKO
+}
+
+enum ShipmentStatus {
+  PENDING
+  CONFIRMED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+model Shipment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  provider        ShippingProvider
+  trackingNumber  String?  @unique
+  
+  originCity      String
+  destinationCity String
+  cost            Float
+  status          ShipmentStatus @default(PENDING)
+  
+  estimatedDays   Int?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  
+  metadata        String?  // JSON string for provider-specific data
+  
+  events          ShipmentEvent[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([trackingNumber])
+  @@index([provider])
+  @@index([status])
+}
+
+model ShipmentEvent {
+  id          String   @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status      ShipmentStatus
+  location    String?
+  description String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([shipmentId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// KURIR TOKO CONFIGURATION
+// ============================================================================
+
+model KurirTokoConfiguration {
+  id                String   @id @default(cuid())
+  
+  // Formula parameters
+  baseGrabRate      Float    @default(1.0) // Multiplier for Grab rate
+  discountPercent   Float    @default(10)  // Discount percentage
+  minimumCharge     Float    @default(15000)
+  surchargePercent  Float    @default(0)
+  
+  isActive          Boolean  @default(true)
+
+  updatedBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model KurirTokoPriceLog {
+  id              String   @id @default(cuid())
+  shipmentId      String?
+  originCity      String
+  destinationCity String
+  
+  grabRate        Float
+  calculatedRate  Float   // After formula applied
+  
+  createdAt       DateTime @default(now())
+
+  @@index([shipmentId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// REPORTING & ANALYTICS
+// ============================================================================
+
+model DailyReport {
+  id              String   @id @default(cuid())
+  date            DateTime
+  
+  totalOrders     Int
+  totalRevenue    Float
+  totalItems      Int
+  cancelledOrders Int
+  completedOrders Int
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([date])
+}
+
+// ============================================================================
+// AUDIT & LOGGING
+// ============================================================================
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action      String   // e.g., "PRODUCT_CREATED", "ORDER_PAID"
+  entity      String?  // e.g., "Product", "Order"
+  entityId    String?
+  
+  changes     String?  // JSON string of before/after values
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// TESTIMONIALS
+// ============================================================================
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  rating    Int      // 1-5 stars
+  message   String
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
