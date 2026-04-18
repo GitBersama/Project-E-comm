@@ -76,7 +76,7 @@ model Address {
   zipCode   String
   country   String @default("Indonesia")
   isDefault Boolean @default(false)
-
+  shippingOrders Order[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -251,7 +251,7 @@ model Order {
   totalAmount   Float
 
   shippingAddressId String?
-  shippingAddress   Address?
+  shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
 
   notes         String?
   
