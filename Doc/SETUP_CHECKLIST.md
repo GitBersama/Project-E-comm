@@ -45,26 +45,32 @@
 
 ---
 
-## Phase 2: Backend Development (Next)
+## Phase 2: Backend Development (In Progress) ✅ Core Setup Complete
 
 ### Core Setup
-- [ ] Copy `.env.example` to `.env` and configure
-- [ ] Run `npm install` in backend/
-- [ ] Initialize PostgreSQL database
-- [ ] Run `npm run prisma:generate`
-- [ ] Run `npm run prisma:migrate`
-- [ ] Run `npm run prisma:seed` (populate sample data)
+- [x] Copy `.env.example` to `.env` and configure
+- [x] Run `npm install` in backend/
+- [x] Initialize PostgreSQL database
+- [x] Run `npm run prisma:generate`
+- [x] Run `npm run prisma:migrate`
+- [x] Backend server running on http://localhost:3000
 
 ### Middleware Implementation
-- [ ] ErrorHandler (catch async errors)
-- [ ] AuthMiddleware (JWT verification)
-- [ ] RBACMiddleware (role-based access control)
-- [ ] ValidationMiddleware (Zod schema validation)
-- [ ] CorsMiddleware (cross-origin configuration)
-- [ ] RateLimiter (for auth endpoints)
+- [x] ErrorHandler (catch async errors)
+- [x] AuthMiddleware (JWT verification)
+- [x] RBACMiddleware (role-based access control)
+- [x] ValidationMiddleware (Zod schema validation)
+- [x] CorsMiddleware (cross-origin configuration)
 
-### Service Layer
-- [ ] AuthService (register, login, JWT, refresh tokens)
+### Authentication System
+- [x] JWT utility functions
+- [x] Password hashing utilities
+- [x] Auth service (register, login, refresh, logout)
+- [x] Auth controller
+- [x] Auth routes
+- [x] Validation schemas
+
+### Service Layer (Next)
 - [ ] ProductService (CRUD, search, filters)
 - [ ] OrderService (create, status updates, calculations)
 - [ ] ShippingService (provider integrations)
@@ -72,8 +78,7 @@
 - [ ] ReportService (sales, inventory, customer reports)
 - [ ] EmailService (order notifications, reports)
 
-### Routes & Controllers
-- [ ] Authentication routes
+### Routes & Controllers (Next)
 - [ ] Product routes
 - [ ] Category routes
 - [ ] Order routes
@@ -99,9 +104,9 @@
 ## Phase 3: Frontend Development (Next)
 
 ### Core Setup
-- [ ] Copy `.env.example` to `.env`
-- [ ] Run `npm install` in frontend/
-- [ ] Verify Vite dev server starts
+- [x] Copy `.env.example` to `.env`
+- [x] Run `npm install` in frontend/
+- [x] Verify Vite dev server starts
 
 ### Layout & Navigation
 - [ ] Header component (navigation, search bar)
